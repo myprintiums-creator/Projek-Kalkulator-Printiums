@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Printiums Calculator - Automasi Kos & Operasi Percetakan</title>
+  <meta name="description" content="Sistem operasi digital untuk automasi sebut harga percetakan. Kira kos sticker, banner, dan printing am secara pintar dengan kawalan margin keuntungan.">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Background glow design element -->
+    <div class="bg-gradient-glow"></div>
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="logo.png" alt="Printiums Logo" class="brand-logo-img">
+        <span class="brand-name">Printiums</span>
+      </div>
+      
+      <ul class="nav-menu">
+        <li class="nav-item active" id="nav-sticker" onclick="switchTab('sticker')">
+          <i class="fa-solid fa-tags"></i>
+          <span>Kalkulator Sticker</span>
+        </li>
+        <li class="nav-item" id="nav-banner" onclick="switchTab('banner')">
+          <i class="fa-solid fa-scroll"></i>
+          <span>Kalkulator Banner</span>
+        </li>
+        <li class="nav-item" id="nav-general" onclick="switchTab('general')">
+          <i class="fa-solid fa-print"></i>
+          <span>Printing Cost</span>
+        </li>
+      </ul>
+      
+      <div class="sidebar-footer">
+        <div class="system-status">
+          <span class="status-dot"></span>
+          <span>AI Engine Connected</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="main-content">
+      <!-- Header Section -->
+      <header class="header-section">
+        <img src="logo.png" alt="Printiums Logo" class="header-logo">
+        <div>
+          <h1 class="header-title" id="main-heading">Automasi Sebut Harga Pelekat</h1>
+          <p class="header-subtitle" id="main-subheading">Kira saiz, bahan, potongan, dan lisu secara dinamik berasaskan diskaun volum.</p>
+        </div>
+      </header>
+
+      <!-- Dashboard Mini Statistics Dashboard (Premium feel) -->
+      <section class="metrics-row" aria-label="Statistik Operasi Harian">
+        <div class="metric-card">
+          <span class="metric-label">Jumlah Pengiraan Hari Ini</span>
+          <div class="metric-value" id="stat-calculations">0</div>
+          <span class="metric-change positive">
+            <i class="fa-solid fa-arrow-up-long"></i> +12% vs semalam
+          </span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Purata Keuntungan Bersih</span>
+          <div class="metric-value" id="stat-avg-margin">40.0%</div>
+          <span class="metric-change positive">
+            <i class="fa-solid fa-shield-halved"></i> Stabil (Kawalan Margin)
+          </span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Jumlah Nilai Quotation</span>
+          <div class="metric-value" id="stat-total-value">RM 0.00</div>
+          <span class="metric-change positive">
+            <i class="fa-solid fa-circle-dollar-to-slot"></i> Potensi Jualan
+          </span>
+        </div>
+      </section>
+
+      <!-- Workspace Area: Calculator + Live Preview -->
+      <div style="display: contents;">
+        
+        <!-- 1. STICKER CALCULATOR SECTION -->
+        <section id="section-sticker" class="calculator-section active" aria-labelledby="main-heading">
+          <!-- Form Card -->
+          <div class="workspace-card">
+            <h2 class="section-title-sub"><i class="fa-solid fa-sliders"></i> Tetapan Pelekat</h2>
+            
+            <form id="sticker-form" oninput="calculateStickerPrice()" onsubmit="event.preventDefault();">
+              <div class="form-grid">
+                
+                <!-- Shape Selector -->
+                <div class="form-group full-width">
+                  <label>Bentuk Pelekat (Shape)</label>
+                  <div class="shape-selector-group" id="sticker-shapes">
+                    <!-- Loaded dynamically via JavaScript -->
+                  </div>
+                  <input type="hidden" id="sticker-shape-input" value="circle">
+                </div>
+
+                <!-- Dimensions & Unit -->
+                <div class="form-group">
+                  <label for="sticker-unit">Unit Ukuran Sticker</label>
+                  <select id="sticker-unit" onchange="updateStickerLabels(); calculateStickerPrice();">
+                    <option value="mm" selected>Milimeter (mm)</option>
+                    <option value="cm">Sentimeter (cm)</option>
+                    <option value="inch">Inci (inch)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Saiz Helaian Kertas (Sheet Size)</label>
+                  <div style="padding: 0.75rem 1rem; background: hsla(224, 25%, 5%, 0.4); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.95rem; font-weight: 600; color: var(--accent);">
+                    Fixed 12" x 19" (A3+)
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="sticker-width" id="lbl-sticker-width">Lebar Sticker (mm)</label>
+                  <input type="number" id="sticker-width" value="50" min="1" step="any" required>
+                </div>
+                <div class="form-group">
+                  <label for="sticker-height" id="lbl-sticker-height">Tinggi Sticker (mm)</label>
+                  <input type="number" id="sticker-height" value="50" min="1" step="any" required>
+                </div>
+
+                <!-- Material Selector -->
+                <div class="form-group">
+                  <label for="sticker-material">Bahan (Material)</label>
+                  <select id="sticker-material" onchange="updateStickerMaterialInfo()"></select>
+                </div>
+                
+                <!-- Lamination Selector -->
+                <div class="form-group">
+                  <label for="sticker-lamination">Laminasi (Lamination)</label>
+                  <select id="sticker-lamination"></select>
+                </div>
+
+                <!-- Material Description -->
+                <div class="form-group full-width">
+                  <div class="material-info" id="sticker-material-desc">
+                    Memuatkan keterangan bahan...
+                  </div>
+                </div>
+
+                <!-- Cutting Type -->
+                <div class="form-group">
+                  <label for="sticker-cutting">Kemasan Potong (Cutting)</label>
+                  <select id="sticker-cutting"></select>
+                </div>
+
+                <!-- Quantity -->
+                <div class="form-group">
+                  <label for="sticker-qty">Kuantiti (Keping/Pcs)</label>
+                  <input type="number" id="sticker-qty" value="100" min="1" step="1" required>
+                </div>
+
+              </div>
+            </form>
+          </div>
+
+          <!-- Preview & Bill of Materials (BOM) -->
+          <div class="preview-card">
+            <h2 class="section-title-sub"><i class="fa-solid fa-eye"></i> Visualisasi & Butiran</h2>
+            
+            <div class="visualizer-container">
+              <div class="sticker-visual" id="visual-sticker">
+                <span id="visual-sticker-text">5.0 x 5.0 cm</span>
+              </div>
+              <span class="visual-dim width" id="visual-sticker-w">50mm</span>
+              <span class="visual-dim height" id="visual-sticker-h">50mm</span>
+            </div>
+
+            <div class="summary-table">
+              <div class="summary-row label-muted">
+                <span>Kos Setup</span>
+                <span id="lbl-sticker-setup">RM 0.00</span>
+              </div>
+              <div class="summary-row label-muted">
+                <span>Sticker Sehelai (12"x19")</span>
+                <span id="lbl-sticker-per-sheet" style="font-weight: 600; color: #fff;">0 pcs</span>
+              </div>
+              <div class="summary-row label-muted">
+                <span>Helaian Kertas Diperlukan</span>
+                <span id="lbl-sticker-sheets-needed" style="font-weight: 600; color: #fff;">0 helai</span>
+              </div>
+              <div class="summary-row label-muted">
+                <span>Kos Cetakan & Bahan</span>
+                <span id="lbl-sticker-base">RM 0.00</span>
+              </div>
+              <div class="summary-row label-muted">
+                <span>Kos Laminasi & Potongan</span>
+                <span id="lbl-sticker-finishing">RM 0.00</span>
+              </div>
+              <div class="summary-row label-muted">
+                <span>Diskaun Helaian (Tier)</span>
+                <span id="lbl-sticker-discount" style="color: var(--accent);">0%</span>
+              </div>
+              <div class="summary-row total">
+                <span>Harga Jualan (SST 0%)</span>
+                <span class="price-highlight" id="lbl-sticker-total">RM 0.00</span>
+              </div>
+              <div class="summary-row" style="margin-top: 5px;">
+                <span>Harga Seunit</span>
+                <span class="unit-price-badge" id="lbl-sticker-unit">RM 0.00 / pc</span>
+              </div>
+            </div>
+
+            <div class="action-btn-group">
+              <button class="btn btn-primary" onclick="saveQuotation('Sticker Label')">
+                <i class="fa-solid fa-save"></i> Simpan Rekod
+              </button>
+              <button class="btn btn-secondary" onclick="printQuotation()">
+                <i class="fa-solid fa-print"></i> Cetak Sebut Harga
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. BANNER CALCULATOR SECTION -->
+        <section id="section-banner" class="calculator-section" aria-labelledby="main-heading">
+          <div class="workspace-card">
+            <h2 class="section-title-sub"><i class="fa-solid fa-sliders"></i> Tetapan Banner / Bunting</h2>
+            
+            <form id="banner-form" oninput="calculateBannerPrice()" onsubmit="event.preventDefault();">
+              <div class="form-grid">
+                
+                <!-- Dimensions (Feet) -->
+                <div class="form-group">
+                  <label for="banner-width">Lebar (Kaki / Feet)</label>
+                  <input type="number" id="banner-width" value="4" min="1" max="100" required>
+                </div>
+                <div class="form-group">
+                  <label for="banner-height">Tinggi (Kaki / Feet)</label>
+                  <input type="number" id="banner-height" value="8" min="1" max="100" required>
+                </div>
+
+                <!-- Material Selector -->
+                <div class="form-group">
+                  <label for="banner-material">Bahan (Material Weight)</label>
+                  <select id="banner-material" onchange="updateBannerMaterialInfo()"></select>
+                </div>
+                
+                <!-- Finishing Selector -->
+                <div class="form-group">
+                  <label for="banner-finishing">Kemasan Banner (Finishing)</label>
+                  <select id="banner-finishing"></select>
+                </div>
+
+                <!-- Material Description -->
+                <div class="form-group full-width">
+                  <div class="material-info" id="banner-material-desc">
+                    Memuatkan keterangan bahan banner...
+                  </div>
+                </div>
+
+                <!-- Quantity -->
+                <div class="form-group">
+                  <label for="banner-qty">Kuantiti (Unit)</label>
+                  <input type="number" id="banner-qty" value="1" min="1" step="1" required>
+                </div>
+
+              </div>
+            </form>
+          </div>
+
+          <!-- Preview & Bill of Materials (BOM) -->
+          <div class="preview-card">
+            <h2 class="section-title-sub"><i class="fa-solid fa-eye"></i> Visualisasi & Butiran</h2>
+            
+            <div class="visualizer-container">
+              <div class="banner-visual" id="visual-banner" style="display: flex;">
+                <span id="visual-banner-text">4' x 8'</span>
+              </div>
+              <span class="visual-dim width" id="visual-banner-w">4 kaki</span>
+              <span class="visual-dim height" id="visual-banner-h">8 kaki</span>
+            </div>
+
+            <div class="summary-table">
+              <div class="summary-row label-muted">
+                <span>Jumlah Luas Kaki Persegi (sqft)</span>
+                <span id="lbl-banner-sqft">32.00 sqft</span>
+              </div>
+              <div class="summary-row label-muted">
+                <span>Harga Asal Bahan</span>
+                <span id="lbl-banner-base">RM 0.00</span>
+              </div>
+              <div class="summary-row label-muted">
+                <span>Kemasan (*Finishing*)</span>
+                <span id="lbl-banner-finishing">RM 0.00</span>
+              </div>
+              <div class="summary-row label-muted">
+                <span>Diskaun Luas (Tier)</span>
+                <span id="lbl-banner-discount" style="color: var(--accent);">0%</span>
+              </div>
+              <div class="summary-row total">
+                <span>Harga Jualan (SST 0%)</span>
+                <span class="price-highlight" id="lbl-banner-total">RM 0.00</span>
+              </div>
+              <div class="summary-row" style="margin-top: 5px;">
+                <span>Harga Seunit</span>
+                <span class="unit-price-badge" id="lbl-banner-unit">RM 0.00 / unit</span>
+              </div>
+            </div>
+
+            <div class="action-btn-group">
+              <button class="btn btn-primary" onclick="saveQuotation('Banner/Bunting')">
+                <i class="fa-solid fa-save"></i> Simpan Rekod
+              </button>
+              <button class="btn btn-secondary" onclick="printQuotation()">
+                <i class="fa-solid fa-print"></i> Cetak Sebut Harga
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. GENERAL PRINTING COST CALCULATOR SECTION -->
+        <section id="section-general" class="calculator-section" aria-labelledby="main-heading">
+          <div class="workspace-card">
+            <h2 class="section-title-sub"><i class="fa-solid fa-sliders"></i> Kos & Operasi Cetakan Am</h2>
+            
+            <form id="general-form" oninput="calculateGeneralPrice()" onsubmit="event.preventDefault();">
+              <div class="form-grid">
+                
+                <!-- Product Selector -->
+                <div class="form-group full-width">
+                  <label for="general-product">Jenis Produk Percetakan</label>
+                  <select id="general-product" onchange="updateGeneralProductInfo()"></select>
+                </div>
+
+                <!-- Product Description -->
+                <div class="form-group full-width">
+                  <div class="material-info" id="general-product-desc" style="border-left-color: var(--accent);">
+                    Memuatkan keterangan produk...
+                  </div>
+                </div>
+
+                <!-- Material Selector -->
+                <div class="form-group">
+                  <label for="general-material">Jenis Kertas (Paper Stock)</label>
+                  <select id="general-material"></select>
+                </div>
+                
+                <!-- Printing Sides -->
+                <div class="form-group">
+                  <label for="general-sides">Muka Cetakan (Sides)</label>
+                  <select id="general-sides"></select>
+                </div>
+
+                <!-- Color Type -->
+                <div class="form-group">
+                  <label for="general-color">Warna Cetakan</label>
+                  <select id="general-color"></select>
+                </div>
+
+                <!-- Quantity -->
+                <div class="form-group">
+                  <label for="general-qty" id="lbl-general-qty-heading">Kuantiti (Unit)</label>
+                  <input type="number" id="general-qty" value="10" min="1" step="1" required>
+                </div>
+
+                <!-- Profit Margin Markup Slider (Operations tool) -->
+                <div class="form-group full-width" style="margin-top: 0.5rem;">
+                  <label for="general-markup">Tokokan Margin Keuntungan (Markup %)</label>
+                  <div class="slider-container">
+                    <input type="range" id="general-markup" min="0" max="150" value="40" step="5">
+                    <span class="slider-val" id="lbl-general-markup-val">40%</span>
+                  </div>
+                </div>
+
+              </div>
+            </form>
+          </div>
+
+          <!-- Preview & Bill of Materials (BOM) -->
+          <div class="preview-card">
+            <h2 class="section-title-sub"><i class="fa-solid fa-eye"></i> Visualisasi & Kos Jualan</h2>
+            
+            <div class="visualizer-container">
+              <div class="general-visual" id="visual-general" style="display: flex;">
+                <i class="fa-solid fa-file-invoice" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                <span id="visual-general-text">Standard</span>
+              </div>
+            </div>
+
+            <div class="summary-table">
+              <div class="summary-row label-muted">
+                <span>Kos Asal Pengeluaran</span>
+                <span id="lbl-general-production">RM 0.00</span>
+              </div>
+              <div class="summary-row label-muted">
+                <span>Kadar Diskaun Kuantiti</span>
+                <span id="lbl-general-discount">0%</span>
+              </div>
+              <div class="summary-row label-muted">
+                <span>Nilai Tokokan (Markup)</span>
+                <span id="lbl-general-markup-cost">RM 0.00</span>
+              </div>
+              <div class="summary-row total">
+                <span>Sebut Harga Dicadangkan</span>
+                <span class="price-highlight" id="lbl-general-total">RM 0.00</span>
+              </div>
+              <div class="summary-row" style="margin-top: 5px;">
+                <span>Harga Jualan Seunit</span>
+                <span class="unit-price-badge" id="lbl-general-unit">RM 0.00 / unit</span>
+              </div>
+            </div>
+
+            <div class="action-btn-group">
+              <button class="btn btn-primary" onclick="saveQuotation('Custom Printing')">
+                <i class="fa-solid fa-save"></i> Simpan Rekod
+              </button>
+              <button class="btn btn-secondary" onclick="printQuotation()">
+                <i class="fa-solid fa-print"></i> Cetak Sebut Harga
+              </button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast notifications for interactions -->
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+  <!-- Load Pricing Database & Application Logic -->
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
