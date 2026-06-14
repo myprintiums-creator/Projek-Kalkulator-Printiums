@@ -161,6 +161,13 @@
                 </div>
 
               </div>
+              <!-- Comparison Grid (Sticker) -->
+              <div class="comparison-container" style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                <h3 style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                  <i class="fa-solid fa-table-list"></i> Perbandingan Kuantiti (Excard Style)
+                </h3>
+                <div id="sticker-comparison-grid"></div>
+              </div>
             </form>
           </div>
 
@@ -174,6 +181,12 @@
               </div>
               <span class="visual-dim width" id="visual-sticker-w">50mm</span>
               <span class="visual-dim height" id="visual-sticker-h">50mm</span>
+            </div>
+
+            <!-- Ready Date Badge -->
+            <div style="background: hsla(170, 90%, 45%, 0.08); border: 1px solid hsla(170, 90%, 45%, 0.15); padding: 0.6rem 0.8rem; border-radius: var(--radius-md); font-size: 0.8rem; display: flex; align-items: center; gap: 0.5rem; color: var(--accent); justify-content: center; margin-bottom: 0.5rem;">
+              <i class="fa-solid fa-business-time"></i>
+              <span>Anggaran Siap: <strong id="lbl-sticker-ready-date">-</strong></span>
             </div>
 
             <div class="summary-table">
@@ -266,6 +279,13 @@
                 </div>
 
               </div>
+              <!-- Comparison Grid (Banner) -->
+              <div class="comparison-container" style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                <h3 style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                  <i class="fa-solid fa-table-list"></i> Perbandingan Kuantiti (Excard Style)
+                </h3>
+                <div id="banner-comparison-grid"></div>
+              </div>
             </form>
           </div>
 
@@ -279,6 +299,12 @@
               </div>
               <span class="visual-dim width" id="visual-banner-w">4 kaki</span>
               <span class="visual-dim height" id="visual-banner-h">8 kaki</span>
+            </div>
+
+            <!-- Ready Date Badge -->
+            <div style="background: hsla(170, 90%, 45%, 0.08); border: 1px solid hsla(170, 90%, 45%, 0.15); padding: 0.6rem 0.8rem; border-radius: var(--radius-md); font-size: 0.8rem; display: flex; align-items: center; gap: 0.5rem; color: var(--accent); justify-content: center; margin-bottom: 0.5rem;">
+              <i class="fa-solid fa-business-time"></i>
+              <span>Anggaran Siap: <strong id="lbl-banner-ready-date">-</strong></span>
             </div>
 
             <div class="summary-table">
@@ -373,6 +399,22 @@
                   </div>
                 </div>
 
+                <!-- Finishing Options (Shown conditionally for business cards) -->
+                <div class="form-group full-width" id="general-finishing-container" style="display: none; margin-top: 0.5rem; border-top: 1px dashed var(--border-color); padding-top: 1rem;">
+                  <label>Pilihan Kemasan Kad Perniagaan (Premium Finishings)</label>
+                  <div class="finishing-grid" id="general-finishings-list">
+                    <!-- Checkbox cards will be dynamically loaded here via JavaScript -->
+                  </div>
+                </div>
+
+              </div>
+              
+              <!-- Comparison Grid (General) -->
+              <div class="comparison-container" style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                <h3 style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                  <i class="fa-solid fa-table-list"></i> Perbandingan Kuantiti (Excard Style)
+                </h3>
+                <div id="general-comparison-grid"></div>
               </div>
             </form>
           </div>
@@ -386,6 +428,12 @@
                 <i class="fa-solid fa-file-invoice" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
                 <span id="visual-general-text">Standard</span>
               </div>
+            </div>
+
+            <!-- Ready Date Badge -->
+            <div style="background: hsla(170, 90%, 45%, 0.08); border: 1px solid hsla(170, 90%, 45%, 0.15); padding: 0.6rem 0.8rem; border-radius: var(--radius-md); font-size: 0.8rem; display: flex; align-items: center; gap: 0.5rem; color: var(--accent); justify-content: center; margin-bottom: 0.5rem;">
+              <i class="fa-solid fa-business-time"></i>
+              <span>Anggaran Siap: <strong id="lbl-general-ready-date">-</strong></span>
             </div>
 
             <div class="summary-table">

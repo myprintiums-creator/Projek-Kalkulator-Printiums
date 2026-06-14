@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initBannerForm();
   initGeneralForm();
   
-  // Align sticker labels with the default unit (inch)
+  // Align sticker labels with the default unit (mm)
   updateStickerLabels();
   
   // Initial calculations
@@ -76,6 +76,30 @@ function showToast(message, type = 'success') {
     toast.style.animation = 'fadeOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards';
     setTimeout(() => toast.remove(), 300);
   }, 3500);
+}
+
+// Helper: Dynamic Business Days Calculator (Skips Saturdays and Sundays)
+function calculateReadyDate(businessDays) {
+  let date = new Date();
+  
+  // Cut-off time: orders placed after 5:00 PM are processed starting tomorrow
+  if (date.getHours() >= 17) {
+    date.setDate(date.getDate() + 1);
+  }
+  
+  let addedDays = 0;
+  while (addedDays < businessDays) {
+    date.setDate(date.getDate() + 1);
+    const day = date.getDay(); // 0 = Sunday, 6 = Saturday
+    if (day !== 0 && day !== 6) {
+      addedDays++;
+    }
+  }
+  
+  const daysName = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
+  const monthsName = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogo', 'Sep', 'Okt', 'Nov', 'Dis'];
+  
+  return `${daysName[date.getDay()]}, ${date.getDate()} ${monthsName[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 // ==========================================================================
@@ -185,14 +209,14 @@ function updateStickerMaterialInfo() {
 
 function updateStickerLabels() {
   const unit = document.getElementById('sticker-unit').value;
-  document.getElementById('lbl-sticker-width').innerText = `Lebar (${unit})`;
-  document.getElementById('lbl-sticker-height').innerText = `Tinggi (${unit})`;
+  document.getElementById('lbl-sticker-width').innerText = `Lebar Sticker (${unit})`;
+  document.getElementById('lbl-sticker-height').innerText = `Tinggi Sticker (${unit})`;
 }
 
-function calculateStickerPrice() {
+// Pure calculation logic for Sticker (used by comparison table & main calculator)
+function getStickerPriceForQty(qty) {
   const width = parseFloat(document.getElementById('sticker-width').value) || 0;
   const height = parseFloat(document.getElementById('sticker-height').value) || 0;
-  const qty = parseInt(document.getElementById('sticker-qty').value) || 0;
   const unit = document.getElementById('sticker-unit').value;
   
   const selectedMatId = document.getElementById('sticker-material').value;
@@ -200,7 +224,6 @@ function calculateStickerPrice() {
   const selectedCutId = document.getElementById('sticker-cutting').value;
   const shapeId = state.sticker.shape;
   
-  // Convert chosen unit to mm for layout fitting
   let wMm = 0;
   let hMm = 0;
   if (unit === 'mm') {
@@ -214,38 +237,23 @@ function calculateStickerPrice() {
     hMm = height * 25.4;
   }
   
-  // Printable area dimensions in mm (A3+ sheet size 304.8 x 482.6 mm minus margins)
   const printAreaW = 294;
   const printAreaH = 472;
-  const gap = selectedCutId === 'kiss_cut' ? 2 : 4; // 2mm gap for kiss-cut, 4mm gap for die-cut
+  const gap = selectedCutId === 'kiss_cut' ? 2 : 4;
   
-  // Fit calculation: Normal Orientation
   const cols = Math.floor((printAreaW + gap) / (wMm + gap));
   const rows = Math.floor((printAreaH + gap) / (hMm + gap));
   const totalNormal = cols > 0 && rows > 0 ? cols * rows : 0;
   
-  // Fit calculation: Rotated Orientation
   const colsRot = Math.floor((printAreaW + gap) / (hMm + gap));
   const rowsRot = Math.floor((printAreaH + gap) / (wMm + gap));
   const totalRotated = colsRot > 0 && rowsRot > 0 ? colsRot * rowsRot : 0;
   
   const stickersPerSheet = Math.max(totalNormal, totalRotated);
-  
-  // Handle case where sticker is too big
-  if (stickersPerSheet <= 0 || wMm <= 0 || hMm <= 0) {
-    document.getElementById('lbl-sticker-per-sheet').innerText = "Tidak Muat!";
-    document.getElementById('lbl-sticker-sheets-needed').innerText = "-";
-    document.getElementById('lbl-sticker-base').innerText = "RM 0.00";
-    document.getElementById('lbl-sticker-finishing').innerText = "RM 0.00";
-    document.getElementById('lbl-sticker-discount').innerText = "0%";
-    document.getElementById('lbl-sticker-total').innerText = "RM 0.00";
-    document.getElementById('lbl-sticker-unit').innerText = "RM 0.000 / pc";
-    return;
-  }
+  if (stickersPerSheet <= 0 || wMm <= 0 || hMm <= 0) return null;
   
   const sheetsNeeded = Math.ceil(qty / stickersPerSheet);
   
-  // Get data values
   const setupCost = PRINT_DATA.sticker.baseSetupCost;
   const basePricePerSheet = PRINT_DATA.sticker.basePricePerSheet;
   
@@ -254,25 +262,15 @@ function calculateStickerPrice() {
   const lam = PRINT_DATA.sticker.laminations.find(l => l.id === selectedLamId);
   const cut = PRINT_DATA.sticker.cuttings.find(c => c.id === selectedCutId);
   
-  if (!shape || !mat || !lam || !cut || qty <= 0) return;
+  if (!shape || !mat || !lam || !cut) return null;
   
-  const shapeMultiplier = shape.multiplier;
-  const materialMultiplier = mat.multiplier;
-  const laminationPricePerSheet = lam.pricePerSheet;
-  const cuttingCostPerSticker = cut.baseCostPerPcs;
-  
-  // Sheet-based print cost
-  const rawPricePerSheet = basePricePerSheet * shapeMultiplier * materialMultiplier;
+  const rawPricePerSheet = basePricePerSheet * shape.multiplier * mat.multiplier;
   const totalRawPrintCost = rawPricePerSheet * sheetsNeeded;
+  const totalLaminationCost = lam.pricePerSheet * sheetsNeeded;
+  const totalCuttingCost = cut.baseCostPerPcs * qty;
   
-  // Lamination & Cutting cost
-  const totalLaminationCost = laminationPricePerSheet * sheetsNeeded;
-  const totalCuttingCost = cuttingCostPerSticker * qty;
-  const totalFinishingCost = totalLaminationCost + totalCuttingCost;
+  const totalProductionCost = totalRawPrintCost + totalLaminationCost;
   
-  const totalProductionCost = totalRawPrintCost + totalLaminationCost; // base material + print + lamination
-  
-  // Determine wholesale discount based on number of sheetsNeeded
   let discountRate = 0;
   for (const tier of PRINT_DATA.sticker.discountTiers) {
     if (sheetsNeeded <= tier.maxSheets) {
@@ -283,54 +281,79 @@ function calculateStickerPrice() {
   
   const discountedProductionCost = totalProductionCost * (1 - discountRate);
   const finalPrice = discountedProductionCost + totalCuttingCost + setupCost;
-  const unitPrice = finalPrice / qty;
   
-  // Update UI Labels
-  document.getElementById('lbl-sticker-setup').innerText = `RM ${setupCost.toFixed(2)}`;
-  document.getElementById('lbl-sticker-per-sheet').innerText = `${stickersPerSheet} pcs`;
-  document.getElementById('lbl-sticker-sheets-needed').innerText = `${sheetsNeeded} helai`;
-  document.getElementById('lbl-sticker-base').innerText = `RM ${totalRawPrintCost.toFixed(2)}`;
-  document.getElementById('lbl-sticker-finishing').innerText = `RM ${totalFinishingCost.toFixed(2)}`;
-  document.getElementById('lbl-sticker-discount').innerText = `${(discountRate * 100).toFixed(0)}%`;
-  document.getElementById('lbl-sticker-total').innerText = `RM ${finalPrice.toFixed(2)}`;
-  document.getElementById('lbl-sticker-unit').innerText = `RM ${unitPrice.toFixed(3)} / pc`;
-  
-  // Update Visualizer
-  const wCm = wMm / 10;
-  const hCm = hMm / 10;
-  document.getElementById('visual-sticker-text').innerText = `${wCm.toFixed(1)} x ${hCm.toFixed(1)} cm`;
-  document.getElementById('visual-sticker-w').innerText = `${width}${unit}`;
-  document.getElementById('visual-sticker-h').innerText = `${height}${unit}`;
-  
-  // Cache current values on state for saving quotes
-  state.sticker.calculated = {
+  return {
     setupCost,
-    totalProductionCost: discountedProductionCost + totalCuttingCost,
+    totalRawPrintCost,
+    totalFinishingCost: totalLaminationCost + totalCuttingCost,
     discountRate,
     finalPrice,
-    unitPrice,
+    unitPrice: finalPrice / qty,
+    stickersPerSheet,
+    sheetsNeeded,
     width,
     height,
     unit,
     qty,
-    stickersPerSheet,
-    sheetsNeeded,
     materialName: mat.name,
     shapeName: shape.name
   };
+}
+
+function calculateStickerPrice() {
+  const qty = parseInt(document.getElementById('sticker-qty').value) || 0;
+  const res = getStickerPriceForQty(qty);
+  
+  if (!res) {
+    document.getElementById('lbl-sticker-per-sheet').innerText = "Tidak Muat!";
+    document.getElementById('lbl-sticker-sheets-needed').innerText = "-";
+    document.getElementById('lbl-sticker-base').innerText = "RM 0.00";
+    document.getElementById('lbl-sticker-finishing').innerText = "RM 0.00";
+    document.getElementById('lbl-sticker-discount').innerText = "0%";
+    document.getElementById('lbl-sticker-total').innerText = "RM 0.00";
+    document.getElementById('lbl-sticker-unit').innerText = "RM 0.000 / pc";
+    return;
+  }
+  
+  // Update UI Labels
+  document.getElementById('lbl-sticker-setup').innerText = `RM ${res.setupCost.toFixed(2)}`;
+  document.getElementById('lbl-sticker-per-sheet').innerText = `${res.stickersPerSheet} pcs`;
+  document.getElementById('lbl-sticker-sheets-needed').innerText = `${res.sheetsNeeded} helai`;
+  document.getElementById('lbl-sticker-base').innerText = `RM ${res.totalRawPrintCost.toFixed(2)}`;
+  document.getElementById('lbl-sticker-finishing').innerText = `RM ${res.totalFinishingCost.toFixed(2)}`;
+  document.getElementById('lbl-sticker-discount').innerText = `${(res.discountRate * 100).toFixed(0)}%`;
+  document.getElementById('lbl-sticker-total').innerText = `RM ${res.finalPrice.toFixed(2)}`;
+  document.getElementById('lbl-sticker-unit').innerText = `RM ${res.unitPrice.toFixed(3)} / pc`;
+  
+  // Ready Date: 2 Business Days
+  document.getElementById('lbl-sticker-ready-date').innerText = calculateReadyDate(2);
+  
+  // Update Visualizer
+  const unit = res.unit;
+  let wCm = res.width;
+  let hCm = res.height;
+  if (unit === 'mm') { wCm /= 10; hCm /= 10; }
+  else if (unit === 'inch') { wCm *= 2.54; hCm *= 2.54; }
+  document.getElementById('visual-sticker-text').innerText = `${wCm.toFixed(1)} x ${hCm.toFixed(1)} cm`;
+  document.getElementById('visual-sticker-w').innerText = `${res.width}${unit}`;
+  document.getElementById('visual-sticker-h').innerText = `${res.height}${unit}`;
+  
+  // Cache to state
+  state.sticker.calculated = res;
+  
+  // Render Comparison Grid (Excard style)
+  renderComparisonGrid('sticker', qty);
 }
 
 // ==========================================================================
 // BANNER CALCULATOR
 // ==========================================================================
 function initBannerForm() {
-  // 1. Materials
   const matSelect = document.getElementById('banner-material');
   matSelect.innerHTML = PRINT_DATA.banner.materials.map(m => 
     `<option value="${m.id}">${m.name}</option>`
   ).join('');
   
-  // 2. Finishings
   const finSelect = document.getElementById('banner-finishing');
   finSelect.innerHTML = PRINT_DATA.banner.finishings.map(f => 
     `<option value="${f.id}">${f.name}</option>`
@@ -347,11 +370,9 @@ function updateBannerMaterialInfo() {
   }
 }
 
-function calculateBannerPrice() {
+function getBannerPriceForQty(qty) {
   const width = parseFloat(document.getElementById('banner-width').value) || 0;
   const height = parseFloat(document.getElementById('banner-height').value) || 0;
-  const qty = parseInt(document.getElementById('banner-qty').value) || 0;
-  
   const selectedMatId = document.getElementById('banner-material').value;
   const selectedFinId = document.getElementById('banner-finishing').value;
   
@@ -359,7 +380,7 @@ function calculateBannerPrice() {
   const mat = PRINT_DATA.banner.materials.find(m => m.id === selectedMatId);
   const fin = PRINT_DATA.banner.finishings.find(f => f.id === selectedFinId);
   
-  if (!mat || !fin || qty <= 0 || width <= 0 || height <= 0) return;
+  if (!mat || !fin || qty <= 0 || width <= 0 || height <= 0) return null;
   
   const sqft = width * height;
   const totalSqFt = sqft * qty;
@@ -382,24 +403,46 @@ function calculateBannerPrice() {
   
   const discountedRawCost = totalRawCost * (1 - discountRate);
   const finalPrice = discountedRawCost + totalFinishingCost;
-  const unitPrice = finalPrice / qty;
+  
+  return {
+    sqft,
+    totalRawCost,
+    totalFinishingCost,
+    discountRate,
+    finalPrice,
+    unitPrice: finalPrice / qty,
+    width,
+    height,
+    qty,
+    materialName: mat.name,
+    finishingName: fin.name
+  };
+}
+
+function calculateBannerPrice() {
+  const qty = parseInt(document.getElementById('banner-qty').value) || 0;
+  const res = getBannerPriceForQty(qty);
+  
+  if (!res) return;
   
   // Update UI Labels
-  document.getElementById('lbl-banner-sqft').innerText = `${sqft.toFixed(2)} sqft`;
-  document.getElementById('lbl-banner-base').innerText = `RM ${totalRawCost.toFixed(2)}`;
-  document.getElementById('lbl-banner-finishing').innerText = `RM ${totalFinishingCost.toFixed(2)}`;
-  document.getElementById('lbl-banner-discount').innerText = `${(discountRate * 100).toFixed(0)}%`;
-  document.getElementById('lbl-banner-total').innerText = `RM ${finalPrice.toFixed(2)}`;
-  document.getElementById('lbl-banner-unit').innerText = `RM ${unitPrice.toFixed(2)} / unit`;
+  document.getElementById('lbl-banner-sqft').innerText = `${res.sqft.toFixed(2)} sqft`;
+  document.getElementById('lbl-banner-base').innerText = `RM ${res.totalRawCost.toFixed(2)}`;
+  document.getElementById('lbl-banner-finishing').innerText = `RM ${res.totalFinishingCost.toFixed(2)}`;
+  document.getElementById('lbl-banner-discount').innerText = `${(res.discountRate * 100).toFixed(0)}%`;
+  document.getElementById('lbl-banner-total').innerText = `RM ${res.finalPrice.toFixed(2)}`;
+  document.getElementById('lbl-banner-unit').innerText = `RM ${res.unitPrice.toFixed(2)} / unit`;
+  
+  // Ready Date: 1 Business Day
+  document.getElementById('lbl-banner-ready-date').innerText = calculateReadyDate(1);
   
   // Update Visualizer
-  document.getElementById('visual-banner-text').innerText = `${width}' x ${height}'`;
-  document.getElementById('visual-banner-w').innerText = `${width} kaki`;
-  document.getElementById('visual-banner-h').innerText = `${height} kaki`;
+  document.getElementById('visual-banner-text').innerText = `${res.width}' x ${res.height}'`;
+  document.getElementById('visual-banner-w').innerText = `${res.width} kaki`;
+  document.getElementById('visual-banner-h').innerText = `${res.height} kaki`;
   
-  // Update aspect ratio of banner preview dynamically
   const visualEl = document.getElementById('visual-banner');
-  const ratio = width / height;
+  const ratio = res.width / res.height;
   if (ratio > 1) { // Landscape
     visualEl.style.width = '170px';
     visualEl.style.height = `${Math.max(40, Math.min(100, 170 / ratio))}px`;
@@ -408,20 +451,11 @@ function calculateBannerPrice() {
     visualEl.style.width = `${Math.max(40, Math.min(120, 140 * ratio))}px`;
   }
   
-  // Cache state for quotation saving
-  state.banner.calculated = {
-    sqft,
-    totalRawCost,
-    totalFinishingCost,
-    discountRate,
-    finalPrice,
-    unitPrice,
-    width,
-    height,
-    qty,
-    materialName: mat.name,
-    finishingName: fin.name
-  };
+  // Cache state
+  state.banner.calculated = res;
+  
+  // Render Comparison Grid (Excard style)
+  renderComparisonGrid('banner', qty);
 }
 
 // ==========================================================================
@@ -448,7 +482,36 @@ function initGeneralForm() {
     `<option value="${c.id}">${c.name}</option>`
   ).join('');
   
+  // Render finishing checkbox card list
+  const fGrid = document.getElementById('general-finishings-list');
+  fGrid.innerHTML = PRINT_DATA.generalPrint.finishings.map(f => `
+    <div class="finishing-card" id="fin-card-${f.id}" onclick="toggleGeneralFinishing('${f.id}')">
+      <input type="checkbox" id="chk-fin-${f.id}" value="${f.id}" onclick="event.stopPropagation(); toggleGeneralFinishing('${f.id}', true);">
+      <div class="finishing-card-content">
+        <span class="finishing-card-title">${f.name}</span>
+        <span class="finishing-card-desc">${f.description} (RM ${f.baseUnitCost.toFixed(2)})</span>
+      </div>
+    </div>
+  `).join('');
+  
   updateGeneralProductInfo();
+}
+
+function toggleGeneralFinishing(finId, isCheckboxClick) {
+  const chk = document.getElementById(`chk-fin-${finId}`);
+  const card = document.getElementById(`fin-card-${finId}`);
+  
+  if (!isCheckboxClick) {
+    chk.checked = !chk.checked;
+  }
+  
+  if (chk.checked) {
+    card.classList.add('active');
+  } else {
+    card.classList.remove('active');
+  }
+  
+  calculateGeneralPrice();
 }
 
 function updateGeneralProductInfo() {
@@ -465,15 +528,29 @@ function updateGeneralProductInfo() {
     }
     
     document.getElementById('lbl-general-qty-heading').innerText = `Kuantiti (${prod.unitLabel})`;
+    
+    // Conditional display of premium finishings (Excard style) - only for Business Card
+    const finContainer = document.getElementById('general-finishing-container');
+    if (productId === 'business_card') {
+      finContainer.style.display = 'block';
+    } else {
+      finContainer.style.display = 'none';
+      // Reset checkboxes
+      document.querySelectorAll('#general-finishings-list input[type="checkbox"]').forEach(chk => {
+        chk.checked = false;
+        document.getElementById(`fin-card-${chk.value}`).classList.remove('active');
+      });
+    }
+    
+    calculateGeneralPrice();
   }
 }
 
-function calculateGeneralPrice() {
+function getGeneralPriceForQty(qty) {
   const productId = document.getElementById('general-product').value;
   const matId = document.getElementById('general-material').value;
   const sideId = document.getElementById('general-sides').value;
   const colorId = document.getElementById('general-color').value;
-  const qty = parseInt(document.getElementById('general-qty').value) || 0;
   const markupPercent = parseFloat(document.getElementById('general-markup').value) || 0;
   
   const prod = PRINT_DATA.generalPrint.products.find(p => p.id === productId);
@@ -481,18 +558,25 @@ function calculateGeneralPrice() {
   const side = PRINT_DATA.generalPrint.sides.find(s => s.id === sideId);
   const color = PRINT_DATA.generalPrint.colorTypes.find(c => c.id === colorId);
   
-  if (!prod || !mat || !side || !color || qty <= 0) return;
-  
-  // Enforce minimum order quantity
-  if (qty < prod.minQty) {
-    document.getElementById('general-qty').value = prod.minQty;
-    return calculateGeneralPrice();
-  }
+  if (!prod || !mat || !side || !color || qty <= 0) return null;
   
   // Base cost calculation
   const totalBaseCost = prod.baseUnitCost * qty;
   const combinedMultiplier = mat.multiplier * side.multiplier * color.multiplier;
   const rawProductionCost = totalBaseCost * combinedMultiplier;
+  
+  // Calculate selected premium finishings (only for business card)
+  let totalFinishingCost = 0;
+  const selectedFinNames = [];
+  if (productId === 'business_card') {
+    document.querySelectorAll('#general-finishings-list input[type="checkbox"]:checked').forEach(chk => {
+      const fin = PRINT_DATA.generalPrint.finishings.find(f => f.id === chk.value);
+      if (fin) {
+        totalFinishingCost += fin.baseUnitCost * qty;
+        selectedFinNames.push(fin.name);
+      }
+    });
+  }
   
   // Calculate quantity discount on production cost
   let discountRate = 0;
@@ -503,36 +587,174 @@ function calculateGeneralPrice() {
     }
   }
   
-  const productionCostWithDiscount = rawProductionCost * (1 - discountRate);
+  const productionCostWithDiscount = (rawProductionCost * (1 - discountRate)) + totalFinishingCost;
   
   // Operations logic: Sales markup
   const markupValue = productionCostWithDiscount * (markupPercent / 100);
   const proposedPrice = productionCostWithDiscount + markupValue;
-  const unitPrice = proposedPrice / qty;
   
-  // Update Labels
-  document.getElementById('lbl-general-production').innerText = `RM ${productionCostWithDiscount.toFixed(2)}`;
-  document.getElementById('lbl-general-discount').innerText = `${(discountRate * 100).toFixed(0)}%`;
-  document.getElementById('lbl-general-markup-cost').innerText = `RM ${markupValue.toFixed(2)}`;
-  document.getElementById('lbl-general-total').innerText = `RM ${proposedPrice.toFixed(2)}`;
-  document.getElementById('lbl-general-unit').innerText = `RM ${unitPrice.toFixed(2)} / ${prod.unitLabel.toLowerCase()}`;
-  
-  // Visualizer
-  document.getElementById('visual-general-text').innerText = prod.name.split(' (')[0];
-  
-  // Cache state for quotation saving
-  state.general.calculated = {
+  return {
     productionCost: productionCostWithDiscount,
     discountRate,
     markupValue,
     markupPercent,
     finalPrice: proposedPrice,
-    unitPrice,
+    unitPrice: proposedPrice / qty,
     qty,
     productName: prod.name,
     unitLabel: prod.unitLabel,
-    materialName: mat.name
+    materialName: mat.name,
+    selectedFinNames
   };
+}
+
+function calculateGeneralPrice() {
+  const qty = parseInt(document.getElementById('general-qty').value) || 0;
+  const res = getGeneralPriceForQty(qty);
+  
+  if (!res) return;
+  
+  // Update Labels
+  document.getElementById('lbl-general-production').innerText = `RM ${res.productionCost.toFixed(2)}`;
+  document.getElementById('lbl-general-discount').innerText = `${(res.discountRate * 100).toFixed(0)}%`;
+  document.getElementById('lbl-general-markup-cost').innerText = `RM ${res.markupValue.toFixed(2)}`;
+  document.getElementById('lbl-general-total').innerText = `RM ${res.finalPrice.toFixed(2)}`;
+  document.getElementById('lbl-general-unit').innerText = `RM ${res.unitPrice.toFixed(2)} / ${res.unitLabel.toLowerCase()}`;
+  
+  // Ready Date: 3 Business Days
+  document.getElementById('lbl-general-ready-date').innerText = calculateReadyDate(3);
+  
+  // Visualizer
+  document.getElementById('visual-general-text').innerText = res.productName.split(' (')[0];
+  
+  // Cache state
+  state.general.calculated = res;
+  
+  // Render Comparison Grid (Excard style)
+  renderComparisonGrid('general', qty);
+}
+
+// ==========================================================================
+// EXCARD STYLE COMPARISON GRID RENDERER
+// ==========================================================================
+function renderComparisonGrid(tabId, currentQty) {
+  let containerId = '';
+  let getPriceFn = null;
+  let unitLabel = '';
+  let comparedQtys = [];
+  
+  if (tabId === 'sticker') {
+    containerId = 'sticker-comparison-grid';
+    getPriceFn = getStickerPriceForQty;
+    unitLabel = 'pc';
+    // Generate relative quantities based on currentQty
+    comparedQtys = [
+      Math.max(10, Math.round(currentQty * 0.25 / 10) * 10),
+      Math.max(20, Math.round(currentQty * 0.5 / 10) * 10),
+      currentQty,
+      Math.round(currentQty * 2 / 50) * 50,
+      Math.round(currentQty * 5 / 100) * 100,
+      Math.round(currentQty * 10 / 100) * 100
+    ];
+  } else if (tabId === 'banner') {
+    containerId = 'banner-comparison-grid';
+    getPriceFn = getBannerPriceForQty;
+    unitLabel = 'unit';
+    comparedQtys = [
+      1, 2, 5, 10, 20
+    ];
+    if (!comparedQtys.includes(currentQty)) {
+      comparedQtys.push(currentQty);
+    }
+    comparedQtys.sort((a,b) => a-b);
+  } else if (tabId === 'general') {
+    containerId = 'general-comparison-grid';
+    getPriceFn = getGeneralPriceForQty;
+    const prodId = document.getElementById('general-product').value;
+    const prod = PRINT_DATA.generalPrint.products.find(p => p.id === prodId);
+    unitLabel = prod ? prod.unitLabel.toLowerCase() : 'unit';
+    
+    // For general printing, Excard style business cards standard volumes: 1, 2, 5, 10, 20, 50 boxes
+    if (prodId === 'business_card') {
+      comparedQtys = [1, 2, 5, 10, 20, 50];
+    } else {
+      comparedQtys = [100, 200, 500, 1000, 2000, 5000];
+    }
+    if (!comparedQtys.includes(currentQty)) {
+      comparedQtys.push(currentQty);
+    }
+    comparedQtys.sort((a,b) => a-b);
+  }
+  
+  // Deduplicate and filter out 0 or negative quantities
+  comparedQtys = [...new Set(comparedQtys)].filter(q => q > 0);
+  
+  // Calculate price for current selection to use as baseline
+  const baselineRes = getPriceFn(currentQty);
+  if (!baselineRes) return;
+  const baselineUnitPrice = baselineRes.unitPrice;
+  
+  let html = `
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th>Kuantiti</th>
+          <th>Harga Jualan</th>
+          <th>Harga Seunit</th>
+          <th>Penjimatan</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+  
+  comparedQtys.forEach(qty => {
+    const res = getPriceFn(qty);
+    if (!res) return;
+    
+    const isActive = qty === currentQty ? 'class="active"' : '';
+    const diffPct = ((res.unitPrice - baselineUnitPrice) / baselineUnitPrice) * 100;
+    
+    let savingBadge = '';
+    if (qty === currentQty) {
+      savingBadge = `<span class="compare-save-badge" style="background-color: var(--primary-glow); color: var(--primary); border-color: var(--primary);">Pilihan</span>`;
+    } else if (diffPct < -1) {
+      savingBadge = `<span class="compare-save-badge">Jimat ${Math.abs(diffPct).toFixed(0)}%</span>`;
+    } else if (diffPct > 1) {
+      savingBadge = `<span class="compare-save-badge" style="background-color: hsla(355, 85%, 55%, 0.1); color: var(--danger); border-color: hsla(355, 85%, 55%, 0.15);">+${diffPct.toFixed(0)}%</span>`;
+    } else {
+      savingBadge = `<span class="compare-save-badge" style="background-color: hsla(220, 15%, 65%, 0.1); color: var(--text-muted); border-color: hsla(220, 15%, 65%, 0.15);">-</span>`;
+    }
+    
+    html += `
+      <tr ${isActive} style="cursor: pointer;" onclick="updateQtyAndRecalculate('${tabId}', ${qty})">
+        <td><strong>${qty}</strong> ${unitLabel}</td>
+        <td>RM ${res.finalPrice.toFixed(2)}</td>
+        <td>RM ${res.unitPrice.toFixed(3)}</td>
+        <td>${savingBadge}</td>
+      </tr>
+    `;
+  });
+  
+  html += `
+      </tbody>
+    </table>
+  `;
+  
+  document.getElementById(containerId).innerHTML = html;
+}
+
+function updateQtyAndRecalculate(tabId, qty) {
+  if (tabId === 'sticker') {
+    document.getElementById('sticker-qty').value = qty;
+    calculateStickerPrice();
+  } else if (tabId === 'banner') {
+    document.getElementById('banner-qty').value = qty;
+    calculateBannerPrice();
+  } else if (tabId === 'general') {
+    document.getElementById('general-qty').value = qty;
+    calculateGeneralPrice();
+  }
+  showToast(`Kuantiti dikemas kini ke ${qty}!`, 'info');
 }
 
 // ==========================================================================
@@ -622,11 +844,12 @@ function printQuotation() {
     quote = state.sticker.calculated;
     specHTML = `
       <p><strong>Bentuk:</strong> ${quote.shapeName}</p>
-      <p><strong>Saiz Sticker:</strong> ${quote.width}${quote.unit} x ${quote.height}${quote.unit} (${(quote.width * (quote.unit === 'inch' ? 2.54 : quote.unit === 'mm' ? 0.1 : 1)).toFixed(1)} x ${(quote.height * (quote.unit === 'inch' ? 2.54 : quote.unit === 'mm' ? 0.1 : 1)).toFixed(1)} cm)</p>
+      <p><strong>Saiz Sticker:</strong> ${quote.width}${quote.unit} x ${quote.height}${quote.unit} (${(quote.width * (quote.unit === 'inch' ? 2.54 : quote.unit === 'mm' ? 0.1 : 1)).toFixed(1)} x  ${(quote.height * (quote.unit === 'inch' ? 2.54 : quote.unit === 'mm' ? 0.1 : 1)).toFixed(1)} cm)</p>
       <p><strong>Bahan:</strong> ${quote.materialName}</p>
       <p><strong>Susunan:</strong> ${quote.stickersPerSheet} pcs sehelai (Kertas 12" x 19")</p>
       <p><strong>Jumlah Helaian:</strong> ${quote.sheetsNeeded} helai</p>
       <p><strong>Laminasi / Potong:</strong> ${document.getElementById('sticker-lamination').options[document.getElementById('sticker-lamination').selectedIndex].text} / ${document.getElementById('sticker-cutting').options[document.getElementById('sticker-cutting').selectedIndex].text}</p>
+      <p><strong>Tarikh Jangka Siap:</strong> ${calculateReadyDate(2)}</p>
     `;
   } else if (state.activeTab === 'banner') {
     quote = state.banner.calculated;
@@ -634,14 +857,18 @@ function printQuotation() {
       <p><strong>Saiz:</strong> ${quote.width}' x ${quote.height}' (${quote.sqft.toFixed(2)} sqft)</p>
       <p><strong>Bahan:</strong> ${quote.materialName}</p>
       <p><strong>Kemasan:</strong> ${quote.finishingName}</p>
+      <p><strong>Tarikh Jangka Siap:</strong> ${calculateReadyDate(1)}</p>
     `;
   } else if (state.activeTab === 'general') {
     quote = state.general.calculated;
+    const listFinishings = quote.selectedFinNames.length > 0 ? quote.selectedFinNames.join(', ') : 'Tiada';
     specHTML = `
       <p><strong>Produk:</strong> ${quote.productName}</p>
       <p><strong>Bahan Kertas:</strong> ${quote.materialName}</p>
       <p><strong>Muka:</strong> ${document.getElementById('general-sides').options[document.getElementById('general-sides').selectedIndex].text}</p>
       <p><strong>Warna:</strong> ${document.getElementById('general-color').options[document.getElementById('general-color').selectedIndex].text}</p>
+      <p><strong>Kemasan Premium:</strong> ${listFinishings}</p>
+      <p><strong>Tarikh Jangka Siap:</strong> ${calculateReadyDate(3)}</p>
     `;
   }
   

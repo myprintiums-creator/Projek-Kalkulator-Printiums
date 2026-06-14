@@ -138,6 +138,14 @@ const PRINT_DATA = {
       { maxQty: 199, discountMultiplier: 0.80 },
       { maxQty: 999, discountMultiplier: 0.70 },
       { maxQty: Infinity, discountMultiplier: 0.55 }
+    ],
+
+    finishings: [
+      { id: 'spot_uv_1side', name: 'Spot UV (1 Sisi)', baseUnitCost: 8.00, description: 'Lapisan kilat bertekstur pada bahagian tertentu kad.' },
+      { id: 'spot_uv_2side', name: 'Spot UV (2 Sisi)', baseUnitCost: 14.00, description: 'Lapisan kilat bertekstur pada kedua-dua sisi kad.' },
+      { id: 'hot_stamping_gold_1side', name: 'Hot Stamping Gold (1 Sisi)', baseUnitCost: 12.00, description: 'Kerajang emas logam berkilau pada 1 sisi kad.' },
+      { id: 'hot_stamping_silver_1side', name: 'Hot Stamping Silver (1 Sisi)', baseUnitCost: 12.00, description: 'Kerajang perak logam berkilau pada 1 sisi kad.' },
+      { id: 'round_corner', name: 'Bucu Bulat (Round Corner)', baseUnitCost: 3.00, description: 'Potongan membulat pada bucu kad (4 penjuru).' }
     ]
   }
 };
