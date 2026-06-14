@@ -49,6 +49,9 @@ document.addEventListener('DOMContentLoaded', () => {
   calculateBannerPrice();
   calculateGeneralPrice();
   
+  // Load saved quotations from local storage
+  initQuotationHistory();
+  
   // Set up markup slider listener
   const markupSlider = document.getElementById('general-markup');
   if (markupSlider) {
@@ -776,31 +779,381 @@ function saveQuotation(typeName) {
     return;
   }
   
-  // Add to local state list
+  const recordId = 'Q-' + Math.floor(100000 + Math.random() * 900000);
+  const dateStr = new Date().toLocaleDateString('ms-MY') + ' ' + new Date().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit' });
+  
+  let inputs = {};
+  let specList = [];
+  let marginVal = 40;
+  
+  if (state.activeTab === 'sticker') {
+    inputs = {
+      shape: state.sticker.shape,
+      width: parseFloat(document.getElementById('sticker-width').value),
+      height: parseFloat(document.getElementById('sticker-height').value),
+      unit: document.getElementById('sticker-unit').value,
+      material: document.getElementById('sticker-material').value,
+      lamination: document.getElementById('sticker-lamination').value,
+      cutting: document.getElementById('sticker-cutting').value,
+      qty: parseInt(document.getElementById('sticker-qty').value)
+    };
+    
+    const shapeText = document.getElementById(`btn-shape-${inputs.shape}`).innerText.trim();
+    const matSelect = document.getElementById('sticker-material');
+    const matText = matSelect.options[matSelect.selectedIndex].text;
+    const lamSelect = document.getElementById('sticker-lamination');
+    const lamText = lamSelect.options[lamSelect.selectedIndex].text;
+    const cutSelect = document.getElementById('sticker-cutting');
+    const cutText = cutSelect.options[cutSelect.selectedIndex].text;
+    
+    specList = [
+      { label: 'Bentuk', value: shapeText },
+      { label: 'Saiz Sticker', value: `${inputs.width}${inputs.unit} x ${inputs.height}${inputs.unit}` },
+      { label: 'Bahan', value: matText },
+      { label: 'Laminasi', value: lamText },
+      { label: 'Potongan', value: cutText },
+      { label: 'Susunan', value: `${quoteData.stickersPerSheet} pcs sehelai (Kertas 12" x 19")` },
+      { label: 'Jumlah Helaian', value: `${quoteData.sheetsNeeded} helai` },
+      { label: 'Tarikh Jangka Siap', value: calculateReadyDate(2) }
+    ];
+  } else if (state.activeTab === 'banner') {
+    inputs = {
+      width: parseFloat(document.getElementById('banner-width').value),
+      height: parseFloat(document.getElementById('banner-height').value),
+      material: document.getElementById('banner-material').value,
+      finishing: document.getElementById('banner-finishing').value,
+      qty: parseInt(document.getElementById('banner-qty').value)
+    };
+    
+    const matSelect = document.getElementById('banner-material');
+    const matText = matSelect.options[matSelect.selectedIndex].text;
+    const finSelect = document.getElementById('banner-finishing');
+    const finText = finSelect.options[finSelect.selectedIndex].text;
+    
+    specList = [
+      { label: 'Saiz', value: `${inputs.width}' x ${inputs.height}' (${quoteData.sqft.toFixed(2)} sqft)` },
+      { label: 'Bahan', value: matText },
+      { label: 'Kemasan', value: finText },
+      { label: 'Tarikh Jangka Siap', value: calculateReadyDate(1) }
+    ];
+  } else if (state.activeTab === 'general') {
+    const checkedFinValues = [];
+    const checkedFinNames = [];
+    document.querySelectorAll('#general-finishings-list input[type="checkbox"]:checked').forEach(chk => {
+      checkedFinValues.push(chk.value);
+      const fin = PRINT_DATA.generalPrint.finishings.find(f => f.id === chk.value);
+      if (fin) checkedFinNames.push(fin.name);
+    });
+    
+    inputs = {
+      product: document.getElementById('general-product').value,
+      material: document.getElementById('general-material').value,
+      sides: document.getElementById('general-sides').value,
+      color: document.getElementById('general-color').value,
+      qty: parseInt(document.getElementById('general-qty').value),
+      markup: parseFloat(document.getElementById('general-markup').value),
+      finishings: checkedFinValues
+    };
+    
+    marginVal = inputs.markup;
+    
+    const prodSelect = document.getElementById('general-product');
+    const prodText = prodSelect.options[prodSelect.selectedIndex].text;
+    const matSelect = document.getElementById('general-material');
+    const matText = matSelect.options[matSelect.selectedIndex].text;
+    const sidesSelect = document.getElementById('general-sides');
+    const sidesText = sidesSelect.options[sidesSelect.selectedIndex].text;
+    const colorSelect = document.getElementById('general-color');
+    const colorText = colorSelect.options[colorSelect.selectedIndex].text;
+    const listFinishings = checkedFinNames.length > 0 ? checkedFinNames.join(', ') : 'Tiada';
+    
+    specList = [
+      { label: 'Produk', value: prodText },
+      { label: 'Bahan Kertas', value: matText },
+      { label: 'Muka Cetakan', value: sidesText },
+      { label: 'Warna Cetakan', value: colorText },
+      { label: 'Kemasan Premium', value: listFinishings },
+      { label: 'Tarikh Jangka Siap', value: calculateReadyDate(3) }
+    ];
+  }
+  
   const record = {
-    id: 'Q-' + Math.floor(100000 + Math.random() * 900000),
+    id: recordId,
     type: typeName,
-    date: new Date().toLocaleTimeString(),
+    tab: state.activeTab,
+    date: dateStr,
     qty: quoteData.qty,
     price: quoteData.finalPrice,
-    margin: state.activeTab === 'general' ? quoteData.markupPercent : 40 // Default margin if sticker/banner
+    unitPrice: quoteData.unitPrice,
+    margin: marginVal,
+    inputs: inputs,
+    specList: specList
   };
   
-  state.stats.savedQuotes.push(record);
+  state.stats.savedQuotes.unshift(record);
+  localStorage.setItem('printiums_saved_quotes', JSON.stringify(state.stats.savedQuotes));
   
   // Recalculate Dashboard statistics
   state.stats.calculationsCount = state.stats.savedQuotes.length;
   state.stats.totalQuotationValue = state.stats.savedQuotes.reduce((acc, q) => acc + q.price, 0);
   
   const sumMargin = state.stats.savedQuotes.reduce((acc, q) => acc + q.margin, 0);
-  const avgMargin = sumMargin / state.stats.savedQuotes.length;
+  const avgMargin = state.stats.savedQuotes.length > 0 ? sumMargin / state.stats.savedQuotes.length : 40;
   
   // Update dashboard metric cards with cool animation
-  animateValue('stat-calculations', parseInt(document.getElementById('stat-calculations').innerText), state.stats.calculationsCount, 300);
+  animateValue('stat-calculations', parseInt(document.getElementById('stat-calculations').innerText) || 0, state.stats.calculationsCount, 300);
   animatePrice('stat-total-value', parseFloat(document.getElementById('stat-total-value').innerText.replace('RM ', '')) || 0, state.stats.totalQuotationValue, 300);
   document.getElementById('stat-avg-margin').innerText = `${avgMargin.toFixed(1)}%`;
   
+  renderHistoryTable();
   showToast(`Sebut harga ${record.id} berjaya direkodkan!`);
+}
+
+function initQuotationHistory() {
+  const stored = localStorage.getItem('printiums_saved_quotes');
+  if (stored) {
+    try {
+      state.stats.savedQuotes = JSON.parse(stored);
+      state.stats.calculationsCount = state.stats.savedQuotes.length;
+      state.stats.totalQuotationValue = state.stats.savedQuotes.reduce((acc, q) => acc + q.price, 0);
+      
+      // Update statistics UI
+      document.getElementById('stat-calculations').innerText = state.stats.calculationsCount;
+      document.getElementById('stat-total-value').innerText = `RM ${state.stats.totalQuotationValue.toFixed(2)}`;
+      
+      if (state.stats.savedQuotes.length > 0) {
+        const sumMargin = state.stats.savedQuotes.reduce((acc, q) => acc + q.margin, 0);
+        const avgMargin = sumMargin / state.stats.savedQuotes.length;
+        document.getElementById('stat-avg-margin').innerText = `${avgMargin.toFixed(1)}%`;
+      } else {
+        document.getElementById('stat-avg-margin').innerText = "40.0%";
+      }
+    } catch (e) {
+      console.error('Error parsing stored quotes:', e);
+      state.stats.savedQuotes = [];
+    }
+  }
+  renderHistoryTable();
+}
+
+function renderHistoryTable() {
+  const tbody = document.getElementById('history-table-body');
+  if (!tbody) return;
+  
+  if (state.stats.savedQuotes.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">Tiada rekod disimpan buat masa ini.</td>
+      </tr>
+    `;
+    return;
+  }
+  
+  tbody.innerHTML = state.stats.savedQuotes.map(q => {
+    let marginLabel = `${q.margin.toFixed(0)}%`;
+    if (q.tab !== 'general') {
+      marginLabel = `${q.margin.toFixed(0)}% (Auto)`;
+    }
+    
+    let unitLabel = 'unit';
+    if (q.tab === 'sticker') unitLabel = 'pcs';
+    else if (q.tab === 'general') {
+      const prod = PRINT_DATA.generalPrint.products.find(p => p.id === q.inputs.product);
+      unitLabel = prod ? prod.unitLabel.toLowerCase() : 'unit';
+    }
+    
+    return `
+      <tr>
+        <td><strong>${q.id}</strong></td>
+        <td>${q.type}</td>
+        <td>${q.qty} ${unitLabel}</td>
+        <td><strong>RM ${q.price.toFixed(2)}</strong></td>
+        <td>${marginLabel}</td>
+        <td style="color: var(--text-muted); font-size: 0.8rem;">${q.date}</td>
+        <td>
+          <div class="btn-action-group">
+            <button class="btn-icon btn-load" title="Buka / Load Rekod" onclick="loadQuotation('${q.id}')">
+              <i class="fa-solid fa-folder-open"></i>
+            </button>
+            <button class="btn-icon btn-print" title="Cetak Sebut Harga" onclick="printQuotationById('${q.id}')">
+              <i class="fa-solid fa-print"></i>
+            </button>
+            <button class="btn-icon btn-delete" title="Padam Rekod" onclick="deleteQuotation('${q.id}')">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function loadQuotation(id) {
+  const quote = state.stats.savedQuotes.find(q => q.id === id);
+  if (!quote) {
+    showToast('Rekod tidak ditemui!', 'danger');
+    return;
+  }
+  
+  // Switch to the correct tab
+  switchTab(quote.tab);
+  
+  // Populate inputs based on tab
+  if (quote.tab === 'sticker') {
+    selectStickerShape(quote.inputs.shape);
+    document.getElementById('sticker-width').value = quote.inputs.width;
+    document.getElementById('sticker-height').value = quote.inputs.height;
+    document.getElementById('sticker-unit').value = quote.inputs.unit;
+    document.getElementById('sticker-material').value = quote.inputs.material;
+    document.getElementById('sticker-lamination').value = quote.inputs.lamination;
+    document.getElementById('sticker-cutting').value = quote.inputs.cutting;
+    document.getElementById('sticker-qty').value = quote.inputs.qty;
+    
+    updateStickerLabels();
+    updateStickerMaterialInfo();
+    calculateStickerPrice();
+  } else if (quote.tab === 'banner') {
+    document.getElementById('banner-width').value = quote.inputs.width;
+    document.getElementById('banner-height').value = quote.inputs.height;
+    document.getElementById('banner-material').value = quote.inputs.material;
+    document.getElementById('banner-finishing').value = quote.inputs.finishing;
+    document.getElementById('banner-qty').value = quote.inputs.qty;
+    
+    updateBannerMaterialInfo();
+    calculateBannerPrice();
+  } else if (quote.tab === 'general') {
+    document.getElementById('general-product').value = quote.inputs.product;
+    document.getElementById('general-material').value = quote.inputs.material;
+    document.getElementById('general-sides').value = quote.inputs.sides;
+    document.getElementById('general-color').value = quote.inputs.color;
+    document.getElementById('general-qty').value = quote.inputs.qty;
+    
+    document.getElementById('general-markup').value = quote.inputs.markup;
+    document.getElementById('lbl-general-markup-val').innerText = `${quote.inputs.markup}%`;
+    
+    updateGeneralProductInfo();
+    
+    document.querySelectorAll('#general-finishings-list input[type="checkbox"]').forEach(chk => {
+      const active = quote.inputs.finishings.includes(chk.value);
+      chk.checked = active;
+      const card = document.getElementById(`fin-card-${chk.value}`);
+      if (card) {
+        if (active) card.classList.add('active');
+        else card.classList.remove('active');
+      }
+    });
+    
+    calculateGeneralPrice();
+  }
+  
+  showToast(`Rekod ${quote.id} berjaya dimuatkan semula!`, 'success');
+}
+
+function deleteQuotation(id) {
+  const index = state.stats.savedQuotes.findIndex(q => q.id === id);
+  if (index === -1) return;
+  
+  const deletedQuote = state.stats.savedQuotes[index];
+  state.stats.savedQuotes.splice(index, 1);
+  localStorage.setItem('printiums_saved_quotes', JSON.stringify(state.stats.savedQuotes));
+  
+  state.stats.calculationsCount = state.stats.savedQuotes.length;
+  state.stats.totalQuotationValue = state.stats.savedQuotes.reduce((acc, q) => acc + q.price, 0);
+  
+  const sumMargin = state.stats.savedQuotes.reduce((acc, q) => acc + q.margin, 0);
+  const avgMargin = state.stats.savedQuotes.length > 0 ? sumMargin / state.stats.savedQuotes.length : 40;
+  
+  document.getElementById('stat-calculations').innerText = state.stats.calculationsCount;
+  document.getElementById('stat-total-value').innerText = `RM ${state.stats.totalQuotationValue.toFixed(2)}`;
+  document.getElementById('stat-avg-margin').innerText = `${avgMargin.toFixed(1)}%`;
+  
+  renderHistoryTable();
+  showToast(`Sebut harga ${deletedQuote.id} telah dipadam!`, 'info');
+}
+
+function clearQuotationHistory() {
+  if (state.stats.savedQuotes.length === 0) {
+    showToast('Tiada rekod untuk dibersihkan.', 'info');
+    return;
+  }
+  
+  if (confirm('Adakah anda pasti mahu memadamkan SEMUA rekod sebut harga tersimpan? Tindakan ini tidak boleh diundurkan.')) {
+    state.stats.savedQuotes = [];
+    localStorage.removeItem('printiums_saved_quotes');
+    
+    state.stats.calculationsCount = 0;
+    state.stats.totalQuotationValue = 0.00;
+    
+    document.getElementById('stat-calculations').innerText = 0;
+    document.getElementById('stat-total-value').innerText = "RM 0.00";
+    document.getElementById('stat-avg-margin').innerText = "40.0%";
+    
+    renderHistoryTable();
+    showToast('Semua sejarah sebut harga telah dibersihkan!', 'success');
+  }
+}
+
+function printQuotationById(id) {
+  const quote = state.stats.savedQuotes.find(q => q.id === id);
+  if (!quote) {
+    showToast('Rekod tidak ditemui!', 'danger');
+    return;
+  }
+  
+  const specHTML = quote.specList.map(s => `
+    <p><strong>${s.label}:</strong> ${s.value}</p>
+  `).join('');
+  
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Sebut Harga Rasmi - ${quote.id}</title>
+        <style>
+          body { font-family: 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #333; line-height: 1.6; }
+          .container { max-width: 650px; margin: auto; border: 1px solid #ddd; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+          .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+          .logo { font-size: 24px; font-weight: 700; color: #1a73e8; }
+          h2 { margin-top: 0; }
+          .specifications { background-color: #f9f9f9; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #1a73e8; }
+          .specifications p { margin: 6px 0; font-size: 14px; }
+          .total-row { font-size: 20px; font-weight: bold; border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px; display: flex; justify-content: space-between; }
+          .footer { margin-top: 40px; font-size: 12px; color: #888; text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
+          .btn-print-now { background-color: #1a73e8; color: white; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; border-radius: 4px; display: block; margin: 20px auto 0 auto; }
+          @media print { .btn-print-now { display: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">Printiums Calculator</div>
+            <div style="text-align: right; font-size: 13px;">No. Rujukan: ${quote.id}<br>Tarikh: ${quote.date.split(' ')[0]}</div>
+          </div>
+          <h2>Sebut Harga Rasmi Cetakan</h2>
+          <p>Terima kasih kerana memilih Printiums Calculator. Berikut adalah perincian kos yang telah disimpan:</p>
+          
+          <div class="specifications">
+            <strong>Spesifikasi Produk:</strong>
+            ${specHTML}
+            <p><strong>Kuantiti:</strong> ${quote.qty}</p>
+          </div>
+          
+          <div class="total-row">
+            <span>Anggaran Harga Jualan (SST 0%):</span>
+            <span style="color: #1a73e8;">RM ${quote.price.toFixed(2)}</span>
+          </div>
+          <p style="font-size: 13px; color: #666; margin-top: 10px;">Purata harga seunit: RM ${quote.unitPrice.toFixed(3)}</p>
+          
+          <button class="btn-print-now" onclick="window.print()">Cetak Halaman Ini</button>
+          
+          <div class="footer">
+            Sebut harga ini dihasilkan secara komputer oleh Enjin Printiums Calculator.
+          </div>
+        </div>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
 }
 
 // Helper animation for counts

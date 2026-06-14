@@ -471,6 +471,36 @@
         </section>
 
       </div>
+
+      <!-- 4. SAVED QUOTATIONS HISTORY SECTION (LocalStorage-backed) -->
+      <section class="history-section workspace-card" style="margin-top: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+          <h2 class="section-title-sub" style="margin-bottom: 0;"><i class="fa-solid fa-clock-rotate-left"></i> Sejarah Rekod Sebut Harga Tersimpan</h2>
+          <button class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="clearQuotationHistory()">
+            <i class="fa-solid fa-trash-can"></i> Bersihkan Sejarah
+          </button>
+        </div>
+        <div class="table-responsive" style="overflow-x: auto; width: 100%;">
+          <table class="comparison-table" id="history-table" style="width: 100%;">
+            <thead>
+              <tr>
+                <th>No. Rujukan</th>
+                <th>Jenis Cetakan</th>
+                <th>Kuantiti</th>
+                <th>Harga Jualan</th>
+                <th>Margin/Markup</th>
+                <th>Masa Disimpan</th>
+                <th>Tindakan</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body">
+              <tr>
+                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">Tiada rekod disimpan buat masa ini.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
   </div>
 
